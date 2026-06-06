@@ -9,6 +9,79 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
+      nextdoor_leads: {
+        Row: {
+          id: string
+          user_id: string
+          poster_id: string
+          post_id: string
+          poster_name: string | null
+          post_snippet: string | null
+          neighborhood: string | null
+          status: Database['public']['Enums']['lead_status']
+          first_seen_at: string
+          status_updated_at: string
+          expires_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          poster_id: string
+          post_id: string
+          poster_name?: string | null
+          post_snippet?: string | null
+          neighborhood?: string | null
+          status?: Database['public']['Enums']['lead_status']
+          first_seen_at?: string
+          status_updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          poster_id?: string
+          post_id?: string
+          poster_name?: string | null
+          post_snippet?: string | null
+          neighborhood?: string | null
+          status?: Database['public']['Enums']['lead_status']
+          status_updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'nextdoor_leads_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'users'
+            referencedColumns: ['id']
+          }
+        ]
+      }
+      nextdoor_watermarks: {
+        Row: {
+          user_id: string
+          last_post_id: string | null
+          last_scanned_at: string
+        }
+        Insert: {
+          user_id: string
+          last_post_id?: string | null
+          last_scanned_at?: string
+        }
+        Update: {
+          user_id?: string
+          last_post_id?: string | null
+          last_scanned_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'nextdoor_watermarks_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: true
+            referencedRelation: 'users'
+            referencedColumns: ['id']
+          }
+        ]
+      }
       customers: {
         Row: {
           id: string
@@ -212,6 +285,7 @@ export interface Database {
       [_ in never]: never
     }
     Enums: {
+      lead_status: "new" | "contacted" | "dismissed"
       pricing_plan_interval: "day" | "week" | "month" | "year"
       pricing_type: "one_time" | "recurring"
       subscription_status:
