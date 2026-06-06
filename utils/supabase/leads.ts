@@ -1,107 +1,68 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { Database } from '@/types_db';
 
-type LeadStatus = Database['public']['Enums']['lead_status'];
-type LeadRow = Database['public']['Tables']['nextdoor_leads']['Row'];
+type Lead = Database['public']['Tables']['leads']['Row'];
 
-export interface IngestPost {
-  poster_id: string;
-  post_id: string;
-  poster_name?: string | null;
-  post_snippet?: string | null;
-  neighborhood?: string | null;
-}
-
-export async function getLeadsByStatus(
-  supabase: SupabaseClient<Database>,
-  userId: string,
-  status: LeadStatus
-): Promise<LeadRow[]> {
-  const now = new Date().toISOString();
+// New leads: unactioned, not flagged irrelevant, within the 7-day active window.
+// Ordered by AI score descending so the best opportunities surface first.
+export async function getNewLeads(
+  supabase: SupabaseClient<Database>
+): Promise<Lead[]> {
+  const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   const { data, error } = await supabase
-    .from('nextdoor_leads')
+    .from('leads')
     .select('*')
-    .eq('user_id', userId)
-    .eq('status', status)
-    .gt('expires_at', now)
-    .order('first_seen_at', { ascending: false });
+    .is('disposition', null)
+    .eq('not_relevant', false)
+    .gte('created_at', cutoff)
+    .order('score', { ascending: false, nullsFirst: false })
+    .order('created_at', { ascending: false });
 
-  if (error) throw new Error(`getLeadsByStatus failed: ${error.message}`);
+  if (error) throw new Error(`getNewLeads: ${error.message}`);
   return data ?? [];
 }
 
-// Inserts new leads using ON CONFLICT DO NOTHING — never overwrites an
-// existing lead's status, so dismissed/contacted leads stay that way
-// even if the agent re-scans the same post.
-export async function upsertLeads(
-  supabase: SupabaseClient<Database>,
-  userId: string,
-  posts: IngestPost[]
-): Promise<void> {
-  if (posts.length === 0) return;
+// Actioned leads for the history tab. Capped at 200 — this is a review view,
+// not a full audit log.
+export async function getLeadHistory(
+  supabase: SupabaseClient<Database>
+): Promise<Lead[]> {
+  const { data, error } = await supabase
+    .from('leads')
+    .select('*')
+    .not('disposition', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(200);
 
-  const rows = posts.map((p) => ({
-    user_id: userId,
-    poster_id: p.poster_id,
-    post_id: p.post_id,
-    poster_name: p.poster_name ?? null,
-    post_snippet: p.post_snippet ?? null,
-    neighborhood: p.neighborhood ?? null,
-    status: 'new' as LeadStatus
-  }));
-
-  const { error } = await supabase.from('nextdoor_leads').upsert(rows, {
-    onConflict: 'user_id,poster_id,post_id',
-    ignoreDuplicates: true
-  });
-
-  if (error) throw new Error(`upsertLeads failed: ${error.message}`);
+  if (error) throw new Error(`getLeadHistory: ${error.message}`);
+  return data ?? [];
 }
 
-export async function updateLeadStatus(
+// Set a single lead's disposition. Any non-empty string is valid — the real
+// schema uses free-text, not an enum.
+export async function setDisposition(
   supabase: SupabaseClient<Database>,
   leadId: string,
-  status: LeadStatus
+  disposition: string
 ): Promise<void> {
   const { error } = await supabase
-    .from('nextdoor_leads')
-    .update({
-      status,
-      status_updated_at: new Date().toISOString()
-    })
+    .from('leads')
+    .update({ disposition })
     .eq('id', leadId);
 
-  if (error) throw new Error(`updateLeadStatus failed: ${error.message}`);
+  if (error) throw new Error(`setDisposition: ${error.message}`);
 }
 
-export async function getWatermark(
+// Bulk dismiss via DB function — atomic, only affects leads still in the
+// new queue (disposition IS NULL).
+export async function bulkDismiss(
   supabase: SupabaseClient<Database>,
-  userId: string
-) {
-  const { data, error } = await supabase
-    .from('nextdoor_watermarks')
-    .select('*')
-    .eq('user_id', userId)
-    .maybeSingle();
+  leadIds: string[]
+): Promise<number> {
+  const { data, error } = await supabase.rpc('bulk_dismiss_leads', {
+    lead_ids: leadIds
+  });
 
-  if (error) throw new Error(`getWatermark failed: ${error.message}`);
-  return data;
-}
-
-export async function setWatermark(
-  supabase: SupabaseClient<Database>,
-  userId: string,
-  lastPostId: string,
-  lastScannedAt: string = new Date().toISOString()
-): Promise<void> {
-  const { error } = await supabase.from('nextdoor_watermarks').upsert(
-    {
-      user_id: userId,
-      last_post_id: lastPostId,
-      last_scanned_at: lastScannedAt
-    },
-    { onConflict: 'user_id' }
-  );
-
-  if (error) throw new Error(`setWatermark failed: ${error.message}`);
+  if (error) throw new Error(`bulkDismiss: ${error.message}`);
+  return (data as number) ?? 0;
 }

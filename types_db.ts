@@ -9,78 +9,87 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
-      nextdoor_leads: {
+      leads: {
         Row: {
           id: string
-          user_id: string
-          poster_id: string
-          post_id: string
-          poster_name: string | null
-          post_snippet: string | null
-          neighborhood: string | null
-          status: Database['public']['Enums']['lead_status']
-          first_seen_at: string
-          status_updated_at: string
-          expires_at: string
+          name: string | null
+          location: string | null
+          zip: string | null
+          post_text: string
+          post_link: string
+          post_date: string | null
+          profile_url: string | null
+          score: number | null
+          score_reasoning: string | null
+          draft_reply: string | null
+          draft_dm: string | null
+          draft_comment: string | null
+          created_at: string
+          not_relevant: boolean
+          disposition: string | null
+          keyword: string | null
+          quoted_at: string | null
+          quoted_amount: number | null
+          notes: string | null
+          phone: string | null
+          email: string | null
+          source: string
+          import_analysis: string | null
+          name_key: string | null
         }
         Insert: {
           id?: string
-          user_id: string
-          poster_id: string
-          post_id: string
-          poster_name?: string | null
-          post_snippet?: string | null
-          neighborhood?: string | null
-          status?: Database['public']['Enums']['lead_status']
-          first_seen_at?: string
-          status_updated_at?: string
+          name?: string | null
+          location?: string | null
+          zip?: string | null
+          post_text: string
+          post_link: string
+          post_date?: string | null
+          profile_url?: string | null
+          score?: number | null
+          score_reasoning?: string | null
+          draft_reply?: string | null
+          draft_dm?: string | null
+          draft_comment?: string | null
+          created_at?: string
+          not_relevant?: boolean
+          disposition?: string | null
+          keyword?: string | null
+          quoted_at?: string | null
+          quoted_amount?: number | null
+          notes?: string | null
+          phone?: string | null
+          email?: string | null
+          source?: string
+          import_analysis?: string | null
         }
         Update: {
           id?: string
-          user_id?: string
-          poster_id?: string
-          post_id?: string
-          poster_name?: string | null
-          post_snippet?: string | null
-          neighborhood?: string | null
-          status?: Database['public']['Enums']['lead_status']
-          status_updated_at?: string
+          name?: string | null
+          location?: string | null
+          zip?: string | null
+          post_text?: string
+          post_link?: string
+          post_date?: string | null
+          profile_url?: string | null
+          score?: number | null
+          score_reasoning?: string | null
+          draft_reply?: string | null
+          draft_dm?: string | null
+          draft_comment?: string | null
+          created_at?: string
+          not_relevant?: boolean
+          disposition?: string | null
+          keyword?: string | null
+          quoted_at?: string | null
+          quoted_amount?: number | null
+          notes?: string | null
+          phone?: string | null
+          email?: string | null
+          source?: string
+          import_analysis?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: 'nextdoor_leads_user_id_fkey'
-            columns: ['user_id']
-            isOneToOne: false
-            referencedRelation: 'users'
-            referencedColumns: ['id']
-          }
-        ]
-      }
-      nextdoor_watermarks: {
-        Row: {
-          user_id: string
-          last_post_id: string | null
-          last_scanned_at: string
-        }
-        Insert: {
-          user_id: string
-          last_post_id?: string | null
-          last_scanned_at?: string
-        }
-        Update: {
-          user_id?: string
-          last_post_id?: string | null
-          last_scanned_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: 'nextdoor_watermarks_user_id_fkey'
-            columns: ['user_id']
-            isOneToOne: true
-            referencedRelation: 'users'
-            referencedColumns: ['id']
-          }
-        ]
+        Relationships: []
       }
       customers: {
         Row: {
@@ -285,7 +294,6 @@ export interface Database {
       [_ in never]: never
     }
     Enums: {
-      lead_status: "new" | "contacted" | "dismissed"
       pricing_plan_interval: "day" | "week" | "month" | "year"
       pricing_type: "one_time" | "recurring"
       subscription_status:

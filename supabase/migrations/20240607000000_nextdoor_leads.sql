@@ -1,77 +1,149 @@
-create type lead_status as enum ('new', 'contacted', 'dismissed');
+-- ============================================================
+-- Nextdoor lead dedup, stale-lead management, and bulk dismiss
+-- Applied to: cleaner-bees-nextdoor-agent (gjmcxedcwmggglpeodtn)
+--
+-- The real schema (leads, messages, runs, settings, keywords)
+-- was created outside of Supabase migrations. This file tracks
+-- only the improvements added on top of that baseline.
+-- ============================================================
 
-create table nextdoor_leads (
-  id                uuid primary key default gen_random_uuid(),
-  user_id           uuid references auth.users not null,
-  poster_id         text not null,
-  post_id           text not null,
-  poster_name       text,
-  post_snippet      text,
-  neighborhood      text,
-  status            lead_status not null default 'new',
-  first_seen_at     timestamp with time zone default timezone('utc', now()) not null,
-  status_updated_at timestamp with time zone default timezone('utc', now()) not null,
-  expires_at        timestamp with time zone
-                      generated always as (first_seen_at + interval '30 days') stored
-);
+-- ============================================================
+-- 1. Disposition protection trigger
+--    Prevents the agent's periodic re-ingest (lookback_days: 7)
+--    from resetting a disposition back to NULL via ON CONFLICT
+--    DO UPDATE. Once a disposition is set, it stays set.
+-- ============================================================
+CREATE OR REPLACE FUNCTION protect_lead_disposition()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF OLD.disposition IS NOT NULL AND NEW.disposition IS NULL THEN
+    NEW.disposition := OLD.disposition;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
 
--- Dedup constraint — ON CONFLICT (user_id, poster_id, post_id) DO NOTHING
--- makes ingest idempotent and prevents dismissed/contacted leads from
--- reappearing as new when the agent re-scans old posts.
-alter table nextdoor_leads
-  add constraint nextdoor_leads_dedup unique (user_id, poster_id, post_id);
+CREATE TRIGGER leads_protect_disposition
+BEFORE UPDATE ON leads
+FOR EACH ROW
+EXECUTE FUNCTION protect_lead_disposition();
 
-create index idx_nextdoor_leads_user_status
-  on nextdoor_leads (user_id, status, expires_at);
+-- ============================================================
+-- 2. Person-level dedup column
+--    profile_url is never populated by the agent, so name_key
+--    (normalised name) is the only way to identify repeat posters.
+-- ============================================================
+ALTER TABLE leads
+  ADD COLUMN IF NOT EXISTS name_key text
+    GENERATED ALWAYS AS (lower(trim(name))) STORED;
 
-alter table nextdoor_leads enable row level security;
+-- ============================================================
+-- 3. Indexes
+-- ============================================================
+CREATE INDEX IF NOT EXISTS idx_leads_new
+  ON leads (created_at DESC)
+  WHERE disposition IS NULL;
 
-create policy "Users can view their own leads."
-  on nextdoor_leads for select
-  using (auth.uid() = user_id);
+CREATE INDEX IF NOT EXISTS idx_leads_actioned
+  ON leads (created_at DESC)
+  WHERE disposition IS NOT NULL;
 
-create policy "Users can insert their own leads."
-  on nextdoor_leads for insert
-  with check (auth.uid() = user_id);
+CREATE INDEX IF NOT EXISTS idx_leads_name_key
+  ON leads (name_key)
+  WHERE name_key IS NOT NULL;
 
-create policy "Users can update their own leads."
-  on nextdoor_leads for update
-  using (auth.uid() = user_id);
+-- ============================================================
+-- 4. Utility view: new leads flagged when the same poster has
+--    already been actioned on a different post.
+-- ============================================================
+CREATE OR REPLACE VIEW new_leads_with_prior_contact AS
+SELECT
+  l.*,
+  EXISTS (
+    SELECT 1 FROM leads prev
+    WHERE prev.name_key    = l.name_key
+      AND prev.id         != l.id
+      AND prev.disposition IS NOT NULL
+  ) AS person_previously_actioned
+FROM leads l
+WHERE l.disposition IS NULL
+  AND l.not_relevant = false;
 
-create policy "Users can delete their own leads."
-  on nextdoor_leads for delete
-  using (auth.uid() = user_id);
+-- ============================================================
+-- 5. Stale threshold — 7 days matches business reality
+--    (most leads are dead after a week)
+-- ============================================================
+INSERT INTO settings (key, value) VALUES ('stale_lead_days', '7')
+ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
 
--- One row per user — tracks where the agent left off scanning.
-create table nextdoor_watermarks (
-  user_id         uuid references auth.users not null primary key,
-  last_post_id    text,
-  last_scanned_at timestamp with time zone default timezone('utc', now()) not null
-);
+-- ============================================================
+-- 6. Auto-dismiss stale leads
+--    Reads stale_lead_days from settings; defaults to 7.
+--    'missed_window' is semantically correct for stale leads.
+--    Called by the agent at the start of each run.
+-- ============================================================
+CREATE OR REPLACE FUNCTION auto_dismiss_stale_leads()
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  stale_days integer;
+  affected   integer;
+BEGIN
+  SELECT COALESCE(value::integer, 7) INTO stale_days
+  FROM settings WHERE key = 'stale_lead_days';
 
-alter table nextdoor_watermarks enable row level security;
+  UPDATE leads
+  SET disposition = 'missed_window'
+  WHERE disposition IS NULL
+    AND created_at < NOW() - (stale_days || ' days')::interval;
 
-create policy "Users can view their own watermark."
-  on nextdoor_watermarks for select
-  using (auth.uid() = user_id);
+  GET DIAGNOSTICS affected = ROW_COUNT;
+  RETURN affected;
+END;
+$$;
 
-create policy "Users can upsert their own watermark."
-  on nextdoor_watermarks for insert
-  with check (auth.uid() = user_id);
+-- ============================================================
+-- 7. Hard-delete leads older than 30 days
+--    Respects the 30-day history window; reclaims disk space.
+--    Called by the agent at the start of each run.
+-- ============================================================
+CREATE OR REPLACE FUNCTION purge_old_leads()
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  affected integer;
+BEGIN
+  DELETE FROM leads WHERE created_at < NOW() - INTERVAL '30 days';
+  GET DIAGNOSTICS affected = ROW_COUNT;
+  RETURN affected;
+END;
+$$;
 
-create policy "Users can update their own watermark."
-  on nextdoor_watermarks for update
-  using (auth.uid() = user_id);
+-- ============================================================
+-- 8. Bulk dismiss by UUID array
+--    Sets disposition = 'dismissed' — a quick-remove signal
+--    distinct from the outcome-specific values (missed_window,
+--    not_a_fit, etc.) that require deliberate categorisation.
+--    Only affects leads currently in the new queue.
+-- ============================================================
+CREATE OR REPLACE FUNCTION bulk_dismiss_leads(lead_ids uuid[])
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  affected integer;
+BEGIN
+  UPDATE leads
+  SET disposition = 'dismissed'
+  WHERE id = ANY(lead_ids)
+    AND disposition IS NULL;
 
--- Hard-delete expired rows (call via pg_cron or manually).
--- Application layer also filters by expires_at > now() so this is optional.
-create or replace function expire_old_leads()
-returns void
-language plpgsql
-security definer
-as $$
-begin
-  delete from nextdoor_leads
-  where expires_at < timezone('utc', now());
-end;
+  GET DIAGNOSTICS affected = ROW_COUNT;
+  RETURN affected;
+END;
 $$;
