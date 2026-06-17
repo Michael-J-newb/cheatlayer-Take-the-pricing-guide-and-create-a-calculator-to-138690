@@ -17,6 +17,19 @@ module.exports = {
       }
     },
     extend: {
+      colors: {
+        sv: {
+          navy: '#080c18',
+          surface: '#0f1729',
+          card: '#131c32',
+          border: '#1e2d4a',
+          gold: '#c9a84c',
+          'gold-light': '#e8c876',
+          'gold-dark': '#a88a3a',
+          silver: '#94a3b8',
+          muted: '#3d5166'
+        }
+      },
       fontFamily: {
         sans: ['var(--font-sans)', ...fontFamily.sans]
       },
@@ -28,11 +41,16 @@ module.exports = {
         'accordion-up': {
           from: { height: 'var(--radix-accordion-content-height)' },
           to: { height: 0 }
+        },
+        'fade-up': {
+          from: { opacity: 0, transform: 'translateY(16px)' },
+          to: { opacity: 1, transform: 'translateY(0)' }
         }
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
-        'accordion-up': 'accordion-up 0.2s ease-out'
+        'accordion-up': 'accordion-up 0.2s ease-out',
+        'fade-up': 'fade-up 0.5s ease-out forwards'
       }
     }
   },

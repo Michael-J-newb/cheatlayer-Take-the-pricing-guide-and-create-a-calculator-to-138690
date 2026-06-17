@@ -2,6 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --sv-navy: #080c18;
+  --sv-surface: #0f1729;
+  --sv-card: #131c32;
+  --sv-gold: #c9a84c;
+  --sv-gold-light: #e8c876;
+  --sv-silver: #94a3b8;
+  --sv-border: #1e2d4a;
+}
+
 *,
 *:before,
 *:after {
@@ -9,7 +19,7 @@
 }
 
 *:focus:not(ol) {
-  @apply outline-none ring-2 ring-pink-500 ring-opacity-50;
+  @apply outline-none ring-2 ring-sv-gold ring-opacity-50;
 }
 
 html {
@@ -28,7 +38,7 @@ body {
     'Helvetica', sans-serif;
   text-rendering: optimizeLegibility;
   -moz-osx-font-smoothing: grayscale;
-  @apply text-white bg-zinc-800 antialiased;
+  @apply text-white bg-sv-navy antialiased;
 }
 
 body {
@@ -48,12 +58,17 @@ p a {
 .animated {
   -webkit-animation-duration: 1s;
   animation-duration: 1s;
-  -webkit-animation-duration: 1s;
-  animation-duration: 1s;
   -webkit-animation-fill-mode: both;
   animation-fill-mode: both;
 }
 
 .height-screen-helper {
   min-height: calc(100vh - 80px);
+}
+
+.sv-grid-bg {
+  background-image:
+    linear-gradient(rgba(201, 168, 76, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(201, 168, 76, 0.04) 1px, transparent 1px);
+  background-size: 40px 40px;
 }
