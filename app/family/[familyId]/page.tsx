@@ -7,7 +7,22 @@ import {
   getFamily,
   getFamilyMembers
 } from '@/utils/family-helpers/queries';
+import { getTimelinesForFamily } from '@/utils/timeline-helpers/queries';
+import { getSignedUrls } from '@/utils/supabase/storage';
 import InviteCodeManager from '@/components/ui/FamilyForms/InviteCodeManager';
+
+function formatDateRange(first: string | null, last: string | null) {
+  if (!first) return null;
+  const fmt = (d: string) =>
+    new Date(d).toLocaleDateString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  const from = fmt(first);
+  const to = last ? fmt(last) : from;
+  return from === to ? from : `${from} – ${to}`;
+}
 
 export default async function FamilyPage({
   params
@@ -26,10 +41,17 @@ export default async function FamilyPage({
     return notFound();
   }
 
-  const [members, invite] = await Promise.all([
+  const [members, invite, timelines] = await Promise.all([
     getFamilyMembers(supabase, params.familyId),
-    getActiveInvite(supabase, params.familyId)
+    getActiveInvite(supabase, params.familyId),
+    getTimelinesForFamily(supabase, params.familyId)
   ]);
+  const coverUrls = await getSignedUrls(
+    supabase,
+    timelines
+      .map((t) => t.cover_storage_path)
+      .filter((p): p is string => p !== null)
+  );
   const isOwner = members.some(
     (m) => m.user_id === user.id && m.role === 'owner'
   );
@@ -47,7 +69,56 @@ export default async function FamilyPage({
           </Link>
         </div>
 
-        {/* Timeline cards land here in M3 */}
+        {timelines.length === 0 ? (
+          <p className="mt-8 text-lg text-zinc-300">
+            No trips yet. Start one and everyone can pile their photos in.
+          </p>
+        ) : (
+          <ul className="grid gap-4 mt-8 sm:grid-cols-2 lg:grid-cols-3">
+            {timelines.map((timeline) => {
+              const coverUrl = timeline.cover_storage_path
+                ? coverUrls.get(timeline.cover_storage_path)
+                : undefined;
+              const dateRange = formatDateRange(
+                timeline.first_captured,
+                timeline.last_captured
+              );
+              return (
+                <li key={timeline.id}>
+                  <Link
+                    href={`/family/${family.id}/${timeline.id}`}
+                    className="block overflow-hidden border rounded-lg border-zinc-700 hover:border-zinc-500"
+                  >
+                    <div className="aspect-video bg-zinc-900">
+                      {coverUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={coverUrl}
+                          alt={`Cover photo for ${timeline.name}`}
+                          className="object-cover w-full h-full"
+                        />
+                      ) : (
+                        <div className="flex items-center justify-center w-full h-full text-zinc-600">
+                          No photos yet
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-4">
+                      <span className="text-lg font-semibold text-white">
+                        {timeline.name}
+                      </span>
+                      <span className="block mt-1 text-sm text-zinc-400">
+                        {timeline.photo_count}{' '}
+                        {timeline.photo_count === 1 ? 'photo' : 'photos'}
+                        {dateRange ? ` · ${dateRange}` : ''}
+                      </span>
+                    </div>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        )}
 
         <div className="grid gap-6 mt-12 md:grid-cols-2">
           <div className="p-6 border rounded-lg border-zinc-700">
