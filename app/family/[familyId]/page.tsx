@@ -44,7 +44,7 @@ export default async function FamilyPage({
   const [members, invite, timelines] = await Promise.all([
     getFamilyMembers(supabase, params.familyId),
     getActiveInvite(supabase, params.familyId),
-    getTimelinesForFamily(supabase, params.familyId)
+    getTimelinesForFamily(supabase, params.familyId, user.id)
   ]);
   const coverUrls = await getSignedUrls(
     supabase,
@@ -89,7 +89,12 @@ export default async function FamilyPage({
                     href={`/family/${family.id}/${timeline.id}`}
                     className="block overflow-hidden border rounded-lg border-zinc-700 hover:border-zinc-500"
                   >
-                    <div className="aspect-video bg-zinc-900">
+                    <div className="relative aspect-video bg-zinc-900">
+                      {timeline.new_photo_count > 0 && (
+                        <span className="absolute z-10 px-2 py-0.5 text-xs font-semibold text-black bg-white rounded-full top-2 right-2">
+                          +{timeline.new_photo_count} new
+                        </span>
+                      )}
                       {coverUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img

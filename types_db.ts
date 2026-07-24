@@ -227,6 +227,39 @@ export interface Database {
           }
         ]
       }
+      timeline_views: {
+        Row: {
+          last_viewed_at: string
+          timeline_id: string
+          user_id: string
+        }
+        Insert: {
+          last_viewed_at?: string
+          timeline_id: string
+          user_id: string
+        }
+        Update: {
+          last_viewed_at?: string
+          timeline_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "timeline_views_timeline_id_fkey"
+            columns: ["timeline_id"]
+            isOneToOne: false
+            referencedRelation: "timelines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "timeline_views_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       timelines: {
         Row: {
           cover_photo_id: string | null

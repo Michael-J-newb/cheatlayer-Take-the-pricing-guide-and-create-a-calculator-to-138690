@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation';
 import { createClient } from '@/utils/supabase/server';
 import { getUser } from '@/utils/supabase/queries';
 import { getTimeline } from '@/utils/timeline-helpers/queries';
+import { recordTimelineView } from '@/utils/timeline-helpers/server';
 import { getPhotosForTimeline } from '@/utils/photo-helpers/queries';
 import { getFamilyMembers } from '@/utils/family-helpers/queries';
 import { getSignedUrls } from '@/utils/supabase/storage';
@@ -26,7 +27,9 @@ export default async function TimelinePage({
 
   const [photos, members] = await Promise.all([
     getPhotosForTimeline(supabase, params.timelineId, user.id),
-    getFamilyMembers(supabase, params.familyId)
+    getFamilyMembers(supabase, params.familyId),
+    // Fire-and-forget: clears this member's "new photos" badge.
+    recordTimelineView(params.timelineId)
   ]);
   const isOwner = members.some(
     (m) => m.user_id === user.id && m.role === 'owner'

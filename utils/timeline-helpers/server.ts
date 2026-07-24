@@ -45,3 +45,21 @@ export async function createTimeline(formData: FormData) {
     'Upload the first photos to bring it to life.'
   );
 }
+
+/** Fire-and-forget from the timeline page; powers the "new photos" badge. */
+export async function recordTimelineView(timelineId: string) {
+  const supabase = createClient();
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+  if (!user) return;
+
+  await supabase.from('timeline_views').upsert(
+    {
+      timeline_id: timelineId,
+      user_id: user.id,
+      last_viewed_at: new Date().toISOString()
+    },
+    { onConflict: 'timeline_id,user_id' }
+  );
+}
