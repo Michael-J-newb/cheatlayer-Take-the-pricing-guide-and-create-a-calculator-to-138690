@@ -201,3 +201,90 @@ export async function finalizePhotoUpload(
   revalidatePath(`/family/${familyId}`);
   return { ok: true, photoId: photo.id, duplicate, locationTown };
 }
+
+export async function toggleLike(photoId: string): Promise<{ liked: boolean }> {
+  const supabase = createClient();
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+  if (!user) return { liked: false };
+
+  const { data: existing } = await supabase
+    .from('photo_likes')
+    .select('photo_id')
+    .eq('photo_id', photoId)
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (existing) {
+    await supabase
+      .from('photo_likes')
+      .delete()
+      .eq('photo_id', photoId)
+      .eq('user_id', user.id);
+    return { liked: false };
+  }
+
+  // RLS checks family membership; PK makes double-clicks idempotent.
+  await supabase
+    .from('photo_likes')
+    .upsert(
+      { photo_id: photoId, user_id: user.id },
+      { onConflict: 'photo_id,user_id', ignoreDuplicates: true }
+    );
+  return { liked: true };
+}
+
+export async function setCoverPhoto(
+  timelineId: string,
+  photoId: string
+): Promise<{ ok: boolean }> {
+  const supabase = createClient();
+  // RLS: update on timelines is owner-only, so no extra checks here.
+  const { error } = await supabase
+    .from('timelines')
+    .update({ cover_photo_id: photoId })
+    .eq('id', timelineId);
+  if (!error) {
+    const { data: timeline } = await supabase
+      .from('timelines')
+      .select('family_id')
+      .eq('id', timelineId)
+      .maybeSingle();
+    if (timeline) revalidatePath(`/family/${timeline.family_id}`);
+  }
+  return { ok: !error };
+}
+
+export async function deletePhoto(
+  photoId: string
+): Promise<{ ok: boolean; error?: string }> {
+  const supabase = createClient();
+  const { data: photo } = await supabase
+    .from('photos')
+    .select('id, storage_path, preview_storage_path, timeline_id, timelines(family_id)')
+    .eq('id', photoId)
+    .maybeSingle();
+  if (!photo) return { ok: false, error: 'Photo not found.' };
+
+  // RLS only lets the uploader delete; 0 rows affected means someone else's.
+  const { error, count } = await supabase
+    .from('photos')
+    .delete({ count: 'exact' })
+    .eq('id', photoId);
+  if (error || !count) {
+    return { ok: false, error: 'You can only delete photos you uploaded.' };
+  }
+
+  const admin = createAdminClient();
+  const paths = [photo.storage_path];
+  if (photo.preview_storage_path) paths.push(photo.preview_storage_path);
+  await admin.storage.from(PHOTOS_BUCKET).remove(paths);
+
+  const familyId = photo.timelines?.family_id;
+  if (familyId) {
+    revalidatePath(`/family/${familyId}/${photo.timeline_id}`);
+    revalidatePath(`/family/${familyId}`);
+  }
+  return { ok: true };
+}
