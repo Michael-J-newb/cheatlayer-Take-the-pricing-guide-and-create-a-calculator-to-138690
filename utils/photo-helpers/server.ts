@@ -150,6 +150,20 @@ export async function finalizePhotoUpload(
 
   const supabase = createClient();
 
+  // A storage object belongs to exactly one photo row — otherwise deleting
+  // one row could rip the object out from under another (admin check: RLS
+  // must not hide rows from this uniqueness test).
+  const admin = createAdminClient();
+  const { data: pathTaken } = await admin
+    .from('photos')
+    .select('id')
+    .eq('storage_path', input.storagePath)
+    .limit(1)
+    .maybeSingle();
+  if (pathTaken) {
+    return { ok: false, error: 'This upload was already saved.' };
+  }
+
   // Duplicate *flagging* only — same checksum in this timeline. Never blocks.
   let duplicate = false;
   if (input.checksumSha256) {
@@ -276,10 +290,20 @@ export async function deletePhoto(
     return { ok: false, error: 'You can only delete photos you uploaded.' };
   }
 
+  // Only remove objects no other row still references (belt-and-braces
+  // with the uniqueness check at finalize time).
   const admin = createAdminClient();
-  const paths = [photo.storage_path];
-  if (photo.preview_storage_path) paths.push(photo.preview_storage_path);
-  await admin.storage.from(PHOTOS_BUCKET).remove(paths);
+  const { data: stillReferenced } = await admin
+    .from('photos')
+    .select('id')
+    .eq('storage_path', photo.storage_path)
+    .limit(1)
+    .maybeSingle();
+  if (!stillReferenced) {
+    const paths = [photo.storage_path];
+    if (photo.preview_storage_path) paths.push(photo.preview_storage_path);
+    await admin.storage.from(PHOTOS_BUCKET).remove(paths);
+  }
 
   const familyId = photo.timelines?.family_id;
   if (familyId) {
