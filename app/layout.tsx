@@ -6,8 +6,9 @@ import { PropsWithChildren, Suspense } from 'react';
 import { getURL } from '@/utils/helpers';
 import 'styles/main.css';
 
-const title = 'Next.js Subscription Starter';
-const description = 'Brought to you by Vercel, Stripe, and Supabase.';
+const title = 'Family Photo Timeline';
+const description =
+  'Upload trip photos together and relive them as one shared timeline.';
 
 export const metadata: Metadata = {
   metadataBase: new URL(getURL()),
@@ -20,25 +21,21 @@ export const metadata: Metadata = {
 };
 
 export default async function RootLayout({ children }: PropsWithChildren) {
-  const web_html = process.env.APP_NAME;
-
   return (
- <html lang="en">
-      
- <html lang="en">
+    <html lang="en">
       <body className="bg-black">
+        <Navbar />
         <main
           id="skip"
           className="min-h-[calc(100dvh-4rem)] md:min-h[calc(100dvh-5rem)]"
         >
           {children}
         </main>
+        <Footer />
         <Suspense>
           <Toaster />
         </Suspense>
       </body>
-    </html>
-
     </html>
   );
 }
