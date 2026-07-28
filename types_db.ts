@@ -9,162 +9,91 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
-      customers: {
+      families: {
         Row: {
+          created_at: string
+          created_by: string
           id: string
-          stripe_customer_id: string | null
+          name: string
         }
         Insert: {
-          id: string
-          stripe_customer_id?: string | null
+          created_at?: string
+          created_by: string
+          id?: string
+          name: string
         }
         Update: {
+          created_at?: string
+          created_by?: string
           id?: string
-          stripe_customer_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "customers_id_fkey"
-            columns: ["id"]
-            isOneToOne: true
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
-      prices: {
-        Row: {
-          active: boolean | null
-          currency: string | null
-          id: string
-          interval: Database["public"]["Enums"]["pricing_plan_interval"] | null
-          interval_count: number | null
-          product_id: string | null
-          trial_period_days: number | null
-          type: Database["public"]["Enums"]["pricing_type"] | null
-          unit_amount: number | null
-        }
-        Insert: {
-          active?: boolean | null
-          currency?: string | null
-          id: string
-          interval?: Database["public"]["Enums"]["pricing_plan_interval"] | null
-          interval_count?: number | null
-          product_id?: string | null
-          trial_period_days?: number | null
-          type?: Database["public"]["Enums"]["pricing_type"] | null
-          unit_amount?: number | null
-        }
-        Update: {
-          active?: boolean | null
-          currency?: string | null
-          id?: string
-          interval?: Database["public"]["Enums"]["pricing_plan_interval"] | null
-          interval_count?: number | null
-          product_id?: string | null
-          trial_period_days?: number | null
-          type?: Database["public"]["Enums"]["pricing_type"] | null
-          unit_amount?: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "prices_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "products"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
-      products: {
-        Row: {
-          active: boolean | null
-          description: string | null
-          id: string
-          image: string | null
-          metadata: Json | null
-          name: string | null
-        }
-        Insert: {
-          active?: boolean | null
-          description?: string | null
-          id: string
-          image?: string | null
-          metadata?: Json | null
-          name?: string | null
-        }
-        Update: {
-          active?: boolean | null
-          description?: string | null
-          id?: string
-          image?: string | null
-          metadata?: Json | null
-          name?: string | null
+          name?: string
         }
         Relationships: []
       }
-      subscriptions: {
+      family_invites: {
         Row: {
-          cancel_at: string | null
-          cancel_at_period_end: boolean | null
-          canceled_at: string | null
-          created: string
-          current_period_end: string
-          current_period_start: string
-          ended_at: string | null
+          code: string
+          created_at: string
+          created_by: string
+          expires_at: string
+          family_id: string
           id: string
-          metadata: Json | null
-          price_id: string | null
-          quantity: number | null
-          status: Database["public"]["Enums"]["subscription_status"] | null
-          trial_end: string | null
-          trial_start: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          created_by: string
+          expires_at: string
+          family_id: string
+          id?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          created_by?: string
+          expires_at?: string
+          family_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "family_invites_family_id_fkey"
+            columns: ["family_id"]
+            isOneToOne: false
+            referencedRelation: "families"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      family_members: {
+        Row: {
+          family_id: string
+          joined_at: string
+          role: Database["public"]["Enums"]["family_role"]
           user_id: string
         }
         Insert: {
-          cancel_at?: string | null
-          cancel_at_period_end?: boolean | null
-          canceled_at?: string | null
-          created?: string
-          current_period_end?: string
-          current_period_start?: string
-          ended_at?: string | null
-          id: string
-          metadata?: Json | null
-          price_id?: string | null
-          quantity?: number | null
-          status?: Database["public"]["Enums"]["subscription_status"] | null
-          trial_end?: string | null
-          trial_start?: string | null
+          family_id: string
+          joined_at?: string
+          role?: Database["public"]["Enums"]["family_role"]
           user_id: string
         }
         Update: {
-          cancel_at?: string | null
-          cancel_at_period_end?: boolean | null
-          canceled_at?: string | null
-          created?: string
-          current_period_end?: string
-          current_period_start?: string
-          ended_at?: string | null
-          id?: string
-          metadata?: Json | null
-          price_id?: string | null
-          quantity?: number | null
-          status?: Database["public"]["Enums"]["subscription_status"] | null
-          trial_end?: string | null
-          trial_start?: string | null
+          family_id?: string
+          joined_at?: string
+          role?: Database["public"]["Enums"]["family_role"]
           user_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "subscriptions_price_id_fkey"
-            columns: ["price_id"]
+            foreignKeyName: "family_members_family_id_fkey"
+            columns: ["family_id"]
             isOneToOne: false
-            referencedRelation: "prices"
+            referencedRelation: "families"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "subscriptions_user_id_fkey"
+            foreignKeyName: "family_members_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"
@@ -172,57 +101,262 @@ export interface Database {
           }
         ]
       }
-      users: {
+      geocode_cache: {
         Row: {
-          avatar_url: string | null
-          billing_address: Json | null
-          full_name: string | null
-          id: string
-          payment_method: Json | null
+          created_at: string
+          location_town: string | null
+          rounded_lat: number
+          rounded_lng: number
         }
         Insert: {
-          avatar_url?: string | null
-          billing_address?: Json | null
-          full_name?: string | null
-          id: string
-          payment_method?: Json | null
+          created_at?: string
+          location_town?: string | null
+          rounded_lat: number
+          rounded_lng: number
         }
         Update: {
-          avatar_url?: string | null
-          billing_address?: Json | null
-          full_name?: string | null
-          id?: string
-          payment_method?: Json | null
+          created_at?: string
+          location_town?: string | null
+          rounded_lat?: number
+          rounded_lng?: number
+        }
+        Relationships: []
+      }
+      photo_likes: {
+        Row: {
+          created_at: string
+          photo_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          photo_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          photo_id?: string
+          user_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "users_id_fkey"
-            columns: ["id"]
-            isOneToOne: true
+            foreignKeyName: "photo_likes_photo_id_fkey"
+            columns: ["photo_id"]
+            isOneToOne: false
+            referencedRelation: "photos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "photo_likes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
           }
         ]
+      }
+      photos: {
+        Row: {
+          captured_at: string | null
+          captured_at_source: Database["public"]["Enums"]["capture_time_source"]
+          checksum_sha256: string | null
+          gps_lat: number | null
+          gps_lng: number | null
+          height: number | null
+          id: string
+          location_town: string | null
+          mime_type: string
+          original_filename: string
+          preview_storage_path: string | null
+          storage_path: string
+          timeline_id: string
+          uploaded_at: string
+          uploader_id: string
+          width: number | null
+        }
+        Insert: {
+          captured_at?: string | null
+          captured_at_source?: Database["public"]["Enums"]["capture_time_source"]
+          checksum_sha256?: string | null
+          gps_lat?: number | null
+          gps_lng?: number | null
+          height?: number | null
+          id?: string
+          location_town?: string | null
+          mime_type: string
+          original_filename: string
+          preview_storage_path?: string | null
+          storage_path: string
+          timeline_id: string
+          uploaded_at?: string
+          uploader_id: string
+          width?: number | null
+        }
+        Update: {
+          captured_at?: string | null
+          captured_at_source?: Database["public"]["Enums"]["capture_time_source"]
+          checksum_sha256?: string | null
+          gps_lat?: number | null
+          gps_lng?: number | null
+          height?: number | null
+          id?: string
+          location_town?: string | null
+          mime_type?: string
+          original_filename?: string
+          preview_storage_path?: string | null
+          storage_path?: string
+          timeline_id?: string
+          uploaded_at?: string
+          uploader_id?: string
+          width?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "photos_timeline_id_fkey"
+            columns: ["timeline_id"]
+            isOneToOne: false
+            referencedRelation: "timelines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "photos_uploader_id_fkey"
+            columns: ["uploader_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      timeline_views: {
+        Row: {
+          last_viewed_at: string
+          timeline_id: string
+          user_id: string
+        }
+        Insert: {
+          last_viewed_at?: string
+          timeline_id: string
+          user_id: string
+        }
+        Update: {
+          last_viewed_at?: string
+          timeline_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "timeline_views_timeline_id_fkey"
+            columns: ["timeline_id"]
+            isOneToOne: false
+            referencedRelation: "timelines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "timeline_views_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      timelines: {
+        Row: {
+          cover_photo_id: string | null
+          created_at: string
+          created_by: string
+          family_id: string
+          id: string
+          name: string
+        }
+        Insert: {
+          cover_photo_id?: string | null
+          created_at?: string
+          created_by: string
+          family_id: string
+          id?: string
+          name: string
+        }
+        Update: {
+          cover_photo_id?: string | null
+          created_at?: string
+          created_by?: string
+          family_id?: string
+          id?: string
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "timelines_cover_photo_id_fkey"
+            columns: ["cover_photo_id"]
+            isOneToOne: false
+            referencedRelation: "photos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "timelines_family_id_fkey"
+            columns: ["family_id"]
+            isOneToOne: false
+            referencedRelation: "families"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      users: {
+        Row: {
+          avatar_url: string | null
+          full_name: string | null
+          id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          full_name?: string | null
+          id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          full_name?: string | null
+          id?: string
+        }
+        Relationships: []
       }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      is_family_creator: {
+        Args: { _family_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_family_member: {
+        Args: { _family_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_family_owner: {
+        Args: { _family_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_photo_family_member: {
+        Args: { _photo_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_timeline_member: {
+        Args: { _timeline_id: string; _user_id: string }
+        Returns: boolean
+      }
+      join_family_with_code: {
+        Args: { _code: string }
+        Returns: string
+      }
+      shares_family_with: {
+        Args: { _other_user_id: string; _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
-      pricing_plan_interval: "day" | "week" | "month" | "year"
-      pricing_type: "one_time" | "recurring"
-      subscription_status:
-        | "trialing"
-        | "active"
-        | "canceled"
-        | "incomplete"
-        | "incomplete_expired"
-        | "past_due"
-        | "unpaid"
-        | "paused"
+      capture_time_source: "exif" | "upload_fallback"
+      family_role: "owner" | "member"
     }
     CompositeTypes: {
       [_ in never]: never

@@ -42,8 +42,7 @@ alter table families enable row level security;
 
 create table family_members (
   family_id uuid references families on delete cascade not null,
-  -- references public.users (not auth.users) so PostgREST can embed profiles
-  user_id uuid references public.users on delete cascade not null,
+  user_id uuid references auth.users on delete cascade not null,
   role family_role not null default 'member',
   joined_at timestamp with time zone not null default timezone('utc'::text, now()),
   primary key (family_id, user_id)
@@ -84,8 +83,7 @@ create index timelines_family_id_idx on timelines (family_id);
 create table photos (
   id uuid primary key default gen_random_uuid(),
   timeline_id uuid references timelines on delete cascade not null,
-  -- references public.users (not auth.users) so PostgREST can embed profiles
-  uploader_id uuid references public.users not null,
+  uploader_id uuid references auth.users not null,
   storage_path text not null,
   -- Server-generated JPEG preview for HEIC originals (nullable otherwise)
   preview_storage_path text,
@@ -111,7 +109,7 @@ alter table timelines
 
 create table photo_likes (
   photo_id uuid references photos on delete cascade not null,
-  user_id uuid references public.users on delete cascade not null,
+  user_id uuid references auth.users on delete cascade not null,
   created_at timestamp with time zone not null default timezone('utc'::text, now()),
   primary key (photo_id, user_id)
 );
